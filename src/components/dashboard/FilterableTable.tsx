@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   Table,
@@ -63,13 +62,23 @@ export function FilterableTable({
   // Filter and sort data
   const filteredData = cases
     .filter(item => {
-      const matchesSearch = searchTerm === '' || 
-        item.job_position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.case_id.toLowerCase().includes(searchTerm.toLowerCase());
-        
-      return matchesSearch;
+      if (searchTerm === '') return true;
+      
+      // Handle string fields with toLowerCase()
+      const jobPositionMatch = typeof item.job_position === 'string' && 
+        item.job_position.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const departmentMatch = typeof item.department === 'string' && 
+        item.department.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const statusMatch = typeof item.status === 'string' && item.status && 
+        item.status.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const caseIdMatch = typeof item.case_id === 'string' ? 
+        item.case_id.toLowerCase().includes(searchTerm.toLowerCase()) : 
+        item.case_id.toString().includes(searchTerm);
+      
+      return jobPositionMatch || departmentMatch || statusMatch || caseIdMatch;
     })
     .sort((a, b) => {
       const aValue = a[sortField];

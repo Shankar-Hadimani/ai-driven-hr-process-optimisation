@@ -41,8 +41,13 @@ export function useHRCases(filters: FilterOptions) {
       // Map the response data to match our interface
       const transformedData = data.map((item: any) => ({
         ...item,
+        id: item.id || item.case_id, // Use case_id as fallback for id
+        created_at: item.created_at || new Date().toISOString(),
         status: item.hiring_status, // Map hiring_status to status for compatibility
         case_id: item.case_id.toString(), // Ensure case_id is a string
+        start_date: item.start_date || null,
+        completion_date: item.completion_date || null,
+        priority: item.priority || null
       })) as HREfficiencyCase[];
       
       return transformedData;
@@ -66,11 +71,15 @@ export function useHREvents() {
       // Map the response data to match our interface
       const transformedData = data.map((item: any) => ({
         ...item,
+        id: item.id || item.event_id,
+        created_at: item.created_at || new Date().toISOString(),
         event_id: item.event_id.toString(),
         case_id: item.case_id?.toString(), // Ensure case_id is a string
         event_type: item.activity || '', // Map activity to event_type for compatibility
         stage_name: item.status || '', // Map status to stage_name for compatibility
-        event_date: item.timestamp
+        event_date: item.timestamp,
+        duration_days: item.duration_days || null,
+        stage_order: item.stage_order || null
       })) as HREfficiencyEvent[];
       
       return transformedData;
@@ -94,10 +103,14 @@ export function useHRSurveyResponses() {
       // Map the response data to match our interface
       const transformedData = data.map((item: any) => ({
         ...item,
+        id: item.id || item.response_id,
+        created_at: item.created_at || new Date().toISOString(),
         response_id: item.response_id.toString(),
         case_id: item.case_id?.toString(),
         overall_score: item.feedback_score,
-        feedback_text: item.comment
+        feedback_text: item.comment,
+        respondent_type: item.respondent_type || null,
+        response_date: item.response_date || new Date().toISOString(),
       })) as HREfficiencySurveyResponse[];
       
       return transformedData;
@@ -109,24 +122,53 @@ export function useRecruitmentStageDelays() {
   return useQuery({
     queryKey: ['stage-delays'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_recruitment_stage_delays')
-        .select('*');
-      
-      if (error) {
-        console.error('Error fetching recruitment stage delays:', error);
-        throw error;
+      try {
+        // Since the view doesn't exist, we'll create a mock implementation using existing tables
+        // This is a temporary solution until the actual view is created in the database
+        const { data: events, error: eventsError } = await supabase
+          .from('hr_efficiency_events')
+          .select('*');
+          
+        if (eventsError) {
+          console.error('Error fetching events for delays:', eventsError);
+          throw eventsError;
+        }
+        
+        // Process the events to simulate the stage delay data
+        // This is just a placeholder implementation
+        const mockDelayData = events.reduce((acc: any[], event: any, index: number, arr: any[]) => {
+          if (index === 0) return acc;
+          
+          // Group by case_id and calculate transitions between statuses
+          const prevEvent = arr[index - 1];
+          if (prevEvent.case_id === event.case_id && prevEvent.status !== event.status) {
+            const timestamp1 = new Date(prevEvent.timestamp || '');
+            const timestamp2 = new Date(event.timestamp || '');
+            const delayDays = Math.max(0, Math.round((timestamp2.getTime() - timestamp1.getTime()) / (1000 * 60 * 60 * 24)));
+            
+            acc.push({
+              id: `${prevEvent.event_id}-${event.event_id}`,
+              case_id: event.case_id.toString(),
+              from_stage: prevEvent.status || '',
+              to_stage: event.status || '',
+              avg_delay_days: delayDays,
+              current_stage: prevEvent.status || '',
+              next_stage: event.status || '',
+              max_delay_days: delayDays,
+              transition_count: 1,
+              department: event.department || '',
+              job_position: ''  // We don't have this in events, would need to join with cases
+            });
+          }
+          return acc;
+        }, []);
+        
+        return mockDelayData as RecruitmentStageDelay[];
+      } catch (error) {
+        console.error('Error in stage delays query:', error);
+        // Return empty array as fallback
+        return [] as RecruitmentStageDelay[];
       }
-      
-      // Map the response data to match our interface
-      const transformedData = data.map((item: any) => ({
-        ...item,
-        case_id: item.case_id?.toString(),
-        from_stage: item.current_stage,
-        to_stage: item.next_stage
-      })) as RecruitmentStageDelay[];
-      
-      return transformedData;
     }
   });
 }
