@@ -120,16 +120,7 @@ export type Database = {
       }
     }
     Views: {
-      vw_recruitment_stage_delays: {
-        Row: {
-          avg_delay_days: number | null
-          current_stage: string | null
-          max_delay_days: number | null
-          next_stage: string | null
-          transition_count: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never
