@@ -1,69 +1,23 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { HREfficiencyCase } from "@/types/hr-types";
+import { Timer, ChartLine, HourglassIcon } from "lucide-react";
 
 interface TimeToHireOverviewProps {
   cases: HREfficiencyCase[];
 }
 
 export function TimeToHireOverview({ cases }: TimeToHireOverviewProps) {
-  // Calculate average time-to-hire
+  // Calculate average time-to-hire and other metrics
   const avgTimeToHire = cases.length > 0 
     ? Math.round(cases.reduce((sum, c) => sum + c.time_to_hire, 0) / cases.length) 
     : 0;
 
-  // Prepare data for the job position chart
-  const jobPositionData = cases.reduce((acc, curr) => {
-    const found = acc.find(item => item.name === curr.job_position);
-    if (found) {
-      found.value += 1;
-      found.totalDays += curr.time_to_hire;
-    } else {
-      acc.push({ 
-        name: curr.job_position, 
-        value: 1, 
-        totalDays: curr.time_to_hire,
-        avgDays: curr.time_to_hire
-      });
-    }
-    return acc;
-  }, [] as Array<{name: string; value: number; totalDays: number; avgDays: number}>);
-  
-  // Calculate average time per job position
-  jobPositionData.forEach(item => {
-    item.avgDays = Math.round(item.totalDays / item.value);
-  });
+  const maxTimeToHire = Math.max(...cases.map(c => c.time_to_hire));
+  const minTimeToHire = Math.min(...cases.map(c => c.time_to_hire));
 
-  // Sort by average days
-  jobPositionData.sort((a, b) => b.avgDays - a.avgDays);
-  
-  // Prepare data for department chart
-  const departmentData = cases.reduce((acc, curr) => {
-    const found = acc.find(item => item.name === curr.department);
-    if (found) {
-      found.value += 1;
-      found.totalDays += curr.time_to_hire;
-    } else {
-      acc.push({ 
-        name: curr.department, 
-        value: 1, 
-        totalDays: curr.time_to_hire,
-        avgDays: curr.time_to_hire
-      });
-    }
-    return acc;
-  }, [] as Array<{name: string; value: number; totalDays: number; avgDays: number}>);
-  
-  // Calculate average time per department
-  departmentData.forEach(item => {
-    item.avgDays = Math.round(item.totalDays / item.value);
-  });
-  
-  // Sort by average days
-  departmentData.sort((a, b) => b.avgDays - a.avgDays);
-
-  // Prepare trend data (last 6 months)
+  // Last 6 months trend data (simplified and more focused)
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
   
@@ -71,22 +25,24 @@ export function TimeToHireOverview({ cases }: TimeToHireOverviewProps) {
     .filter(c => new Date(c.created_at) >= sixMonthsAgo)
     .reduce((acc, curr) => {
       const date = new Date(curr.created_at);
-      const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
+      const monthYear = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
       
       const found = acc.find(item => item.month === monthYear);
       if (found) {
         found.count += 1;
         found.totalDays += curr.time_to_hire;
+        found.maxDays = Math.max(found.maxDays, curr.time_to_hire);
       } else {
         acc.push({ 
           month: monthYear, 
           count: 1, 
           totalDays: curr.time_to_hire,
-          avgDays: curr.time_to_hire
+          avgDays: curr.time_to_hire,
+          maxDays: curr.time_to_hire
         });
       }
       return acc;
-    }, [] as Array<{month: string; count: number; totalDays: number; avgDays: number}>);
+    }, [] as Array<{month: string; count: number; totalDays: number; avgDays: number; maxDays: number}>);
   
   // Calculate average time per month
   monthlyData.forEach(item => {
@@ -95,101 +51,94 @@ export function TimeToHireOverview({ cases }: TimeToHireOverviewProps) {
   
   // Sort by month chronologically
   monthlyData.sort((a, b) => {
-    const [aMonth, aYear] = a.month.split('/').map(Number);
-    const [bMonth, bYear] = b.month.split('/').map(Number);
-    return (aYear * 12 + aMonth) - (bYear * 12 + bMonth);
+    const [aMonth, aYear] = a.month.split(' ');
+    const [bMonth, bYear] = b.month.split(' ');
+    return new Date(`${aMonth} 1, ${aYear}`).getTime() - new Date(`${bMonth} 1, ${bYear}`).getTime();
   });
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Card className="col-span-2">
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Time to Hire</CardTitle>
+            <Timer className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{avgTimeToHire} days</div>
+            <p className="text-xs text-muted-foreground">
+              Across all departments
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Fastest Hire</CardTitle>
+            <ChartLine className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{minTimeToHire} days</div>
+            <p className="text-xs text-muted-foreground">
+              Best performance
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Longest Hire</CardTitle>
+            <HourglassIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{maxTimeToHire} days</div>
+            <p className="text-xs text-muted-foreground">
+              Needs attention
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
         <CardHeader>
-          <CardTitle>Time-to-Hire Overview</CardTitle>
-          <CardDescription>
-            Overall average time-to-hire: <span className="font-bold text-dashboard-blue">{avgTimeToHire} days</span>
-          </CardDescription>
+          <CardTitle>Time-to-Hire Trends (Last 6 Months)</CardTitle>
+          <CardDescription>Average and maximum days to hire by month</CardDescription>
         </CardHeader>
         <CardContent className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <ComposedChart
               data={monthlyData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
+              <XAxis 
+                dataKey="month" 
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval={0}
+              />
               <YAxis />
               <Tooltip 
-                formatter={(value: number) => [`${value} days`, 'Avg Time-to-Hire']}
+                formatter={(value: number, name: string) => {
+                  return [`${value} days`, name === "avgDays" ? "Average" : "Maximum"];
+                }}
                 labelFormatter={(label) => `Month: ${label}`}
               />
               <Legend />
-              <Line 
-                type="monotone" 
+              <Bar 
                 dataKey="avgDays" 
-                name="Avg Time to Hire" 
-                stroke="#3498db" 
-                activeDot={{ r: 8 }}
-                strokeWidth={2}
+                name="Average Days" 
+                fill="#8884d8" 
+                radius={[4, 4, 0, 0]}
               />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Time-to-Hire by Job Position</CardTitle>
-          <CardDescription>Average days to hire for each position</CardDescription>
-        </CardHeader>
-        <CardContent className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={jobPositionData.slice(0, 10)}
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis 
-                type="category" 
-                dataKey="name" 
-                tick={{ fontSize: 12 }}
-                width={80}
+              <Area
+                type="monotone"
+                dataKey="maxDays"
+                name="Maximum Days"
+                fill="#ffc658"
+                stroke="#ffc658"
+                fillOpacity={0.3}
               />
-              <Tooltip 
-                formatter={(value: number) => [`${value} days`, 'Avg Time-to-Hire']}
-              />
-              <Bar dataKey="avgDays" name="Average Days" fill="#1abc9c" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Time-to-Hire by Department</CardTitle>
-          <CardDescription>Average days to hire for each department</CardDescription>
-        </CardHeader>
-        <CardContent className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={departmentData}
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis 
-                type="category" 
-                dataKey="name" 
-                tick={{ fontSize: 12 }}
-                width={80}
-              />
-              <Tooltip 
-                formatter={(value: number) => [`${value} days`, 'Avg Time-to-Hire']}
-              />
-              <Bar dataKey="avgDays" name="Average Days" fill="#9b59b6" />
-            </BarChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
