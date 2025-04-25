@@ -120,7 +120,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      recruitment_stage_delays: {
+        Row: {
+          avg_delay_days: number | null
+          current_stage: string | null
+          max_delay_days: number | null
+          next_stage: string | null
+          transition_count: number | null
+        }
+        Relationships: []
+      }
+      rw_recruitment_stage_delays: {
+        Row: {
+          avg_delay_days: number | null
+          current_stage: string | null
+          max_delay_days: number | null
+          next_stage: string | null
+          transition_count: number | null
+        }
+        Relationships: []
+      }
+      vw_recruitment_stage_delays: {
+        Row: {
+          avg_delay_days: number | null
+          current_stage: string | null
+          max_delay_days: number | null
+          next_stage: string | null
+          transition_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

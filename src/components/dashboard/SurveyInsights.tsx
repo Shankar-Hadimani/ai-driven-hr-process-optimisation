@@ -8,37 +8,45 @@ interface SurveyInsightsProps {
 }
 
 export function SurveyInsights({ surveys }: SurveyInsightsProps) {
-  // Count sentiment distributions
+  // Count sentiment distributions with case-insensitive comparison and null handling
   const sentimentCounts = {
-    positive: surveys.filter(s => s.sentiment === 'positive').length,
-    neutral: surveys.filter(s => s.sentiment === 'neutral').length,
-    negative: surveys.filter(s => s.sentiment === 'negative').length
+    positive: surveys.filter(s => s.sentiment?.toLowerCase() === 'positive').length,
+    neutral: surveys.filter(s => s.sentiment?.toLowerCase() === 'neutral').length,
+    negative: surveys.filter(s => s.sentiment?.toLowerCase() === 'negative').length,
+    unknown: surveys.filter(s => !s.sentiment).length
   };
   
   const sentimentData = [
     { name: 'Positive', value: sentimentCounts.positive },
     { name: 'Neutral', value: sentimentCounts.neutral },
     { name: 'Negative', value: sentimentCounts.negative }
-  ];
+  ].filter(item => item.value > 0); // Only show segments with values
+
+  if (sentimentCounts.unknown > 0) {
+    sentimentData.push({ name: 'Unknown', value: sentimentCounts.unknown });
+  }
   
   const SENTIMENT_COLORS = {
     Positive: '#2ecc71',
     Neutral: '#f1c40f',
-    Negative: '#e74c3c'
+    Negative: '#e74c3c',
+    Unknown: '#95a5a6'
   };
 
   // Calculate average scores by respondent type
   const respondentTypeData = surveys.reduce((acc, curr) => {
+    if (!curr.respondent_type) return acc;
+    
     const found = acc.find(item => item.name === curr.respondent_type);
     if (found) {
       found.count += 1;
-      found.totalScore += curr.overall_score;
+      found.totalScore += curr.overall_score || curr.feedback_score || 0;
     } else {
       acc.push({
         name: curr.respondent_type,
         count: 1,
-        totalScore: curr.overall_score,
-        avgScore: curr.overall_score
+        totalScore: curr.overall_score || curr.feedback_score || 0,
+        avgScore: curr.overall_score || curr.feedback_score || 0
       });
     }
     return acc;
@@ -65,29 +73,38 @@ export function SurveyInsights({ surveys }: SurveyInsightsProps) {
           <CardDescription>Overall sentiment from survey responses</CardDescription>
         </CardHeader>
         <CardContent className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={sentimentData}
-                cx="50%"
-                cy="50%"
-                innerRadius={70}
-                outerRadius={90}
-                paddingAngle={5}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {sentimentData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={SENTIMENT_COLORS[entry.name as keyof typeof SENTIMENT_COLORS]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value: number, name: string) => [value, name]}
-                labelFormatter={() => 'Sentiment'}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {sentimentData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={sentimentData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={70}
+                  outerRadius={90}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {sentimentData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={SENTIMENT_COLORS[entry.name as keyof typeof SENTIMENT_COLORS]} 
+                    />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value: number, name: string) => [value, name]}
+                  labelFormatter={() => 'Sentiment'}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              No sentiment data available
+            </div>
+          )}
         </CardContent>
       </Card>
       
