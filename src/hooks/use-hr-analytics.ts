@@ -1,6 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { FilterOptions, HREfficiencyCase, HREfficiencyEvent, HREfficiencySurveyResponse, RecruitmentStageDelay } from '@/types/hr-types';
 
 export function useHRCases(filters: FilterOptions) {
@@ -101,43 +101,25 @@ export function useFilterOptions() {
   return useQuery({
     queryKey: ['filter-options'],
     queryFn: async () => {
-      // Fetch departments
-      const { data: departments, error: deptError } = await supabase
+      // Fetch all cases first
+      const { data: allCases, error: casesError } = await supabase
         .from('hr_efficiency_cases')
-        .select('department')
-        .distinct();
+        .select('department, job_position, status');
       
-      if (deptError) {
-        console.error('Error fetching departments:', deptError);
-        throw deptError;
+      if (casesError) {
+        console.error('Error fetching filter options:', casesError);
+        throw casesError;
       }
       
-      // Fetch job positions
-      const { data: positions, error: posError } = await supabase
-        .from('hr_efficiency_cases')
-        .select('job_position')
-        .distinct();
-      
-      if (posError) {
-        console.error('Error fetching job positions:', posError);
-        throw posError;
-      }
-      
-      // Fetch statuses
-      const { data: statuses, error: statusError } = await supabase
-        .from('hr_efficiency_cases')
-        .select('status')
-        .distinct();
-      
-      if (statusError) {
-        console.error('Error fetching statuses:', statusError);
-        throw statusError;
-      }
+      // Extract unique values using JavaScript instead of database distinct
+      const departments = Array.from(new Set(allCases.map(c => c.department).filter(Boolean)));
+      const jobPositions = Array.from(new Set(allCases.map(c => c.job_position).filter(Boolean)));
+      const statuses = Array.from(new Set(allCases.map(c => c.status).filter(Boolean)));
       
       return {
-        departments: departments.map(d => d.department),
-        jobPositions: positions.map(p => p.job_position),
-        statuses: statuses.map(s => s.status)
+        departments,
+        jobPositions,
+        statuses
       };
     }
   });
